@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <title>worker harness</title>
+  </head>
+  <body>
+    <p id="out">loading…</p>
+    <script type="module">
+      import worker from '../worker/worker.js';
+      window.__worker = worker;
+      window.__ready = true;
+      document.getElementById('out').textContent = 'ready';
+    </script>
+  </body>
+</html>

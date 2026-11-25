@@ -1,0 +1,13 @@
+name = "bus-stop-25159"
+main = "worker.js"
+compatibility_date = "2026-11-25"
+workers_dev = true
+
+# 선택 사항: 공공데이터포털 인증키를 넣으면 TOPIS·카카오가 모두 실패할 때
+# 공식 API(ws.bus.go.kr)를 마지막 출처로 사용합니다. 없어도 동작합니다.
+#   wrangler secret put SEOUL_BUS_API_KEY
+# [vars]
+# SEOUL_BUS_API_KEY = ""
+
+[observability]
+enabled = true

@@ -1,0 +1,199 @@
+{
+ "ok": true,
+ "stop": {
+  "name": "서울현대요양병원",
+  "arsId": "25159",
+  "stId": "124000059",
+  "direction": "천호역2번출구.현대백화점 방면"
+ },
+ "source": "topis",
+ "fetchedAt": "2026-11-25T09:55:25.766Z",
+ "routes": [
+  {
+   "route": "340",
+   "dir": "강남역",
+   "category": "trunk",
+   "categoryLabel": "간선",
+   "routeId": "100100055",
+   "eta1": {
+    "msg": "곧 도착",
+    "state": "soon",
+    "sec": 29,
+    "stops": null
+   },
+   "eta2": {
+    "msg": "10분36초후[6번째 전]",
+    "state": "running",
+    "sec": 636,
+    "stops": 6
+   },
+   "low1": true,
+   "last1": false,
+   "last2": false,
+   "first": "04:30",
+   "last": "23:10",
+   "term": 7,
+   "congestion1": 3,
+   "congestion2": 5,
+   "vehicle1": "서울74사9681",
+   "vehicle2": "서울70사9576",
+   "sectNm": "천호동공원~친구병원",
+   "nextStop": "천호역2번출구.현대백화점"
+  },
+  {
+   "route": "3318",
+   "dir": "마천동",
+   "category": "branch",
+   "categoryLabel": "지선",
+   "routeId": "100100498",
+   "eta1": {
+    "msg": "곧 도착",
+    "state": "soon",
+    "sec": 29,
+    "stops": null
+   },
+   "eta2": {
+    "msg": "13분4초후[7번째 전]",
+    "state": "running",
+    "sec": 784,
+    "stops": 7
+   },
+   "low1": true,
+   "last1": false,
+   "last2": false,
+   "first": "04:30",
+   "last": "23:10",
+   "term": 12,
+   "congestion1": 3,
+   "congestion2": 3,
+   "vehicle1": "서울74사9049",
+   "vehicle2": "서울74사8584",
+   "sectNm": "천호동공원~친구병원",
+   "nextStop": "천호역2번출구.현대백화점"
+  },
+  {
+   "route": "3321",
+   "dir": "강동구청",
+   "category": "branch",
+   "categoryLabel": "지선",
+   "routeId": "100100578",
+   "eta1": {
+    "msg": "17분30초후[10번째 전]",
+    "state": "running",
+    "sec": 1050,
+    "stops": 10
+   },
+   "eta2": {
+    "msg": "21분59초후[13번째 전]",
+    "state": "running",
+    "sec": 1319,
+    "stops": 13
+   },
+   "low1": true,
+   "last1": false,
+   "last2": false,
+   "first": "04:30",
+   "last": "23:40",
+   "term": 14,
+   "congestion1": 4,
+   "congestion2": 3,
+   "vehicle1": "서울75사2921",
+   "vehicle2": "서울74사5041",
+   "sectNm": "천일중.구강사~친구병원",
+   "nextStop": "천호역2번출구.현대백화점"
+  },
+  {
+   "route": "3324",
+   "dir": "강동역",
+   "category": "branch",
+   "categoryLabel": "지선",
+   "routeId": "104000013",
+   "eta1": {
+    "msg": "14분13초후[6번째 전]",
+    "state": "running",
+    "sec": 853,
+    "stops": 6
+   },
+   "eta2": {
+    "msg": "24분16초후[11번째 전]",
+    "state": "running",
+    "sec": 1456,
+    "stops": 11
+   },
+   "low1": true,
+   "last1": false,
+   "last2": false,
+   "first": "04:20",
+   "last": "23:20",
+   "term": 13,
+   "congestion1": 5,
+   "congestion2": 3,
+   "vehicle1": "서울74사1557",
+   "vehicle2": "서울70사6340",
+   "sectNm": "천호동공원~친구병원",
+   "nextStop": "천호역2번출구.현대백화점"
+  },
+  {
+   "route": "3411",
+   "dir": "한티역",
+   "category": "branch",
+   "categoryLabel": "지선",
+   "routeId": "100100223",
+   "eta1": {
+    "msg": "6분57초후[3번째 전]",
+    "state": "running",
+    "sec": 417,
+    "stops": 3
+   },
+   "eta2": {
+    "msg": "19분56초후[12번째 전]",
+    "state": "running",
+    "sec": 1196,
+    "stops": 12
+   },
+   "low1": true,
+   "last1": false,
+   "last2": false,
+   "first": "04:30",
+   "last": "23:10",
+   "term": 11,
+   "congestion1": 3,
+   "congestion2": 3,
+   "vehicle1": "서울74사9315",
+   "vehicle2": "서울74사1534",
+   "sectNm": "천호동공원~친구병원",
+   "nextStop": "천호역2번출구.현대백화점"
+  },
+  {
+   "route": "N31",
+   "dir": "국민대",
+   "category": "night",
+   "categoryLabel": "심야",
+   "routeId": "104000011",
+   "eta1": {
+    "msg": "운행종료",
+    "state": "ended",
+    "sec": null,
+    "stops": null
+   },
+   "eta2": {
+    "msg": "운행종료",
+    "state": "ended",
+    "sec": null,
+    "stops": null
+   },
+   "low1": false,
+   "last1": false,
+   "last2": false,
+   "first": "23:30",
+   "last": "03:50",
+   "term": 38,
+   "congestion1": null,
+   "congestion2": null,
+   "vehicle1": null,
+   "vehicle2": null,
+   "sectNm": "천호동공원~친구병원",
+   "nextStop": "천호역2번출구.현대백화점"
+  }
+ ]
+}
