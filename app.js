@@ -178,7 +178,9 @@
     top.className = "route__top";
     const dir = document.createElement("span");
     dir.className = "route__dir";
-    dir.textContent = (route.dir || route.categoryLabel || "방면 정보 없음") + (route.dir ? " 방면" : "");
+    const known = STATIC_ROUTES.find((r) => r.route === route.route);
+    const dirText = route.dir || (known ? known.dir : "");
+    dir.textContent = dirText ? dirText + " 방면" : route.categoryLabel || "방면 정보 없음";
     top.appendChild(dir);
 
     if (route.low1) {

@@ -141,6 +141,10 @@ def main():
         check("fallback: 카카오 eta 초", all(isinstance((x.get("eta1") or {}).get("sec"), (int, float)) or
                                              (x.get("eta1") or {}).get("state") in ("none", "ended")
                                              for x in (b.get("routes") or [])))
+        fb_routes = {x["route"]: x for x in (b.get("routes") or [])}
+        check("fallback: 카카오 노선명 정리(N31 (심야) → N31)", "N31" in fb_routes and all("(" not in r for r in fb_routes), list(fb_routes))
+        check("fallback: 카카오 방면은 비워 둔다", all((x.get("dir") or "") == "" for x in (b.get("routes") or [])),
+              [x.get("dir") for x in (b.get("routes") or [])])
         check("fallback: TOPIS 시도 기록", any(a.get("source") == "topis" for a in (b.get("attempts") or [])), b.get("attempts"))
 
         # 4) 모든 출처 실패 → 502

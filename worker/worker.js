@@ -184,7 +184,8 @@ function normalizeKakaoStop(data, stop) {
   const lines = Array.isArray(data && data.lines) ? data.lines : [];
   const out = [];
   for (const line of lines) {
-    const route = String((line && line.name) || '').trim();
+    // 카카오는 "N31 (심야)"처럼 꼬리표를 붙여 준다 — 배지에는 노선 번호만 쓴다.
+    const route = String((line && line.name) || '').replace(/\s*\([^)]*\)\s*$/, '').trim();
     if (!route) continue;
     const a = line.arrival || {};
     const key = String(line.busLineType || '').toUpperCase();
@@ -217,10 +218,10 @@ function normalizeKakaoStop(data, stop) {
       };
     };
 
-    const dirText = String(a.direction || data.direction || '').replace(/\s*방향$/, '').trim();
+    // 카카오의 direction 은 정류장 방면(이 정류장의 진행 방향)이라 노선 종점이 아니다.
     out.push({
       route,
-      dir: dirText,
+      dir: '',
       category: cat.key,
       categoryLabel: cat.label,
       routeId: String(line.id || ''),
