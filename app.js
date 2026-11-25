@@ -3,7 +3,7 @@
   "use strict";
 
   /* 배포한 Cloudflare Worker 주소. 비워 두면 첫 실행 때 설정 화면에서 입력한다. */
-  const DEFAULT_API = "";
+  const DEFAULT_API = "https://bus-stop-25159.mokbo97.workers.dev";
 
   const STOP = { name: "서울현대요양병원", arsId: "25159" };
   const REFRESH_MS = 30000;

@@ -82,6 +82,7 @@ def main():
         hit = {"count": 0}
 
         any_host = re.compile(r"https://relay2?\.example\.test/.*")
+        api_host = re.compile(r"https://bus-stop-25159\.mokbo97\.workers\.dev/.*")
 
         def fulfill(route_):
             if any_host.match(route_.request.url):
@@ -188,24 +189,30 @@ def main():
         page2.screenshot(path=str(SHOTS / "04-error.png"), full_page=True)
         check("오류 화면 JS 예외 0", len(errs2) == 0, errs2[:2])
 
-        # 중계 서버 없이 쓰는 기본 화면 (GitHub Pages 단독)
+        # 기본 화면: 내장 Worker(DEFAULT_API)로 곧바로 실시간을 불러온다 (2026-11-25 Worker 배포)
         page3 = ctx.new_page()
         errs3 = []
         page3.on("pageerror", lambda e: errs3.append(str(e)))
         page3.add_init_script("localStorage.clear();")
+        page3.route(api_host, lambda r: r.fulfill(status=200, content_type="application/json",
+                                                  body=json.dumps(payload, ensure_ascii=False),
+                                                  headers={"access-control-allow-origin": "*"}))
         page3.goto(f"http://127.0.0.1:{PORT}/site/index.html")
-        page3.wait_for_timeout(800)
+        page3.wait_for_selector(".route", timeout=15000)
+        page3.wait_for_timeout(600)
         b3 = page3.locator("#banner")
         check("기본 화면에 서버 경고 배너 없음", not b3.is_visible(), b3.inner_text() if b3.is_visible() else "(hidden)")
         status3 = page3.locator("#statusText").inner_text()
-        check("기본 화면 상태 문구", "정류장 안내" in status3 and "미설정" not in status3, status3)
+        check("기본 화면 실시간 상태 문구", "실시간" in status3 and "미설정" not in status3, status3)
         check("기본 화면 노선 카드 6개", page3.locator(".route").count() == 6, page3.locator(".route").count())
-        terms = page3.locator('.route [data-role="term"]').all_inner_texts()
-        check("배차 간격 표시", terms == ["배차 7분", "배차 12분", "배차 14분", "배차 13분", "배차 11분", "배차 38분"], terms)
+        metas = page3.locator(".route .route__meta").all_inner_texts()
+        check("배차 간격 표시", len(metas) == 6 and all("배차" in m for m in metas) and "7분" in metas[0], metas)
         meta3 = page3.locator('.route[data-route="340"] .route__meta').inner_text()
-        check("첫차·막차 표시", "첫차 04:30" in meta3 and "막차 23:10" in meta3, meta3)
-        check("기본 화면 새로고침 숨김", not page3.locator("#refreshBtn").is_visible())
-        check("기본 화면 안내 문구", "지도" in page3.locator("#footnote").inner_text(), page3.locator("#footnote").inner_text())
+        check("첫차·막차 표시", "04:30" in meta3 and "23:10" in meta3, meta3)
+        eta3 = page3.locator('.route[data-route="340"] [data-role="eta1"]').inner_text()
+        check("기본 화면 도착 시간 표시", any(k in eta3 for k in ("분", "곧 도착", "운행종료")), eta3)
+        check("기본 화면 새로고침 표시", page3.locator("#refreshBtn").is_visible())
+        check("기본 화면 안내 문구", "자동 새로고침" in page3.locator("#footnote").inner_text(), page3.locator("#footnote").inner_text())
         check("기본 화면에도 지도 버튼 사용", page3.locator("#naverLink").is_visible() and page3.locator("#kakaoLink").is_visible())
         # 서버 없이도 즐겨찾기 고정이 동작·저장되는지
         page3.locator('.route[data-route="N31"] .pin').click()
@@ -213,7 +220,7 @@ def main():
         order3 = page3.locator(".badge").all_inner_texts()
         stored3 = page3.evaluate("localStorage.getItem('bus25159.pins')")
         check("기본 화면에서도 고정 동작", order3[0] == "N31" and stored3 and "N31" in stored3, (order3, stored3))
-        page3.screenshot(path=str(SHOTS / "05-static.png"), full_page=True)
+        page3.screenshot(path=str(SHOTS / "05-default.png"), full_page=True)
         check("기본 화면 JS 예외 0", len(errs3) == 0, errs3[:2])
 
         # 다크 모드

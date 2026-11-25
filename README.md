@@ -1,11 +1,13 @@
 # 서울현대요양병원 정류장 (25-159)
 
 서울 강동구 올림픽로 689, **서울현대요양병원** 정류장(정류소 ID 25-159 · ARS 25159 · 내부 ID 124000059,
-천호역2번출구·현대백화점 방면)을 아이폰 홈 화면에 추가해 쓰는 정적 웹앱입니다.
-**서버 없이 GitHub Pages만으로** 동작합니다.
+천호역2번출구·현대백화점 방면)을 아이폰 홈 화면에 추가해 쓰는 웹앱입니다.
+**GitHub Pages**(앱) + **Cloudflare Worker**(중계)로 동작합니다.
 
-- **노선 안내**: 340(강남역) · 3318(마천동) · 3321(강동구청) · 3324(강동역) · 3411(한티역) · N31(국민대·심야)
-  — 노선별 배차 간격·첫차·막차를 카드로 표시
+- **실시간 도착**: 340 · 3318 · 3321 · 3324 · 3411 · N31 여섯 노선의 도착 예정시간을 앱 안에서 30초마다 자동 갱신.
+  서울시 TOPIS(1차)·카카오맵(2차)에서 받아 Cloudflare Worker가 CORS 헤더를 붙여 중계합니다.
+  중계 응답이 없으면 마지막으로 받은 정보를 보여 주고, 지도 버튼으로 바로 넘어갈 수 있습니다.
+- **노선 안내**: 노선별 배차 간격·첫차·막차를 카드에 함께 표시
 - **즐겨찾기 고정**: 카드의 ★를 누르면 자주 타는 노선이 맨 위로 (기기 localStorage 저장)
 - **1초 점프**: 하단의 **네이버지도** / **카카오맵** 버튼으로 정류장 실시간 도착 화면을 바로 엽니다.
   (네이버지도 <https://map.naver.com/p/bus/bus-station/-/bus-station/109370>,
@@ -18,15 +20,12 @@
 | 경로 | 설명 |
 | --- | --- |
 | `index.html`, `styles.css`, `app.js`, `sw.js`, `manifest.webmanifest`, 아이콘 | 홈 화면에 추가하는 PWA (Pages 루트) |
-| `worker/worker.js`, `worker/wrangler.toml` | (선택) 앱 안에서도 도착 시간을 보고 싶을 때 쓰는 Cloudflare Worker |
+| `worker/worker.js`, `worker/wrangler.toml` | 도착정보 중계 Cloudflare Worker (`https://bus-stop-25159.mokbo97.workers.dev`) |
 
-## 선택: 앱 안에서 실시간 도착 시간 보기
+## 중계 서버
 
-기본 화면은 노선 안내 + 지도 바로가기만 씁니다. 도착 시간을 앱 안에서도 보고 싶으면:
-
-1. Cloudflare Workers에 `worker/worker.js`를 배포합니다(아래 참고) → `https://bus-stop-25159.<계정>.workers.dev`
-2. 앱 오른쪽 위 **설정(⚙)** → **중계 서버 주소**에 그 주소를 넣고 저장하면
-   30초마다 자동 갱신되는 도착 시간 카드로 바뀝니다. 주소를 비우면 다시 안내 화면으로 돌아옵니다.
+`app.js`의 `DEFAULT_API`에 배포된 Worker 주소가 들어 있어, 설치하면 바로 실시간 화면으로 시작합니다.
+앱 설정(⚙)의 **중계 서버 주소**를 바꾸면 다른 중계로도 붙일 수 있고, 비우면 안내 화면으로 돌아옵니다.
 
 브라우저는 서울시 도착정보를 직접 부를 수 없습니다(CORS 헤더 없음). Worker가 대신 받아 옵니다.
 
@@ -55,3 +54,5 @@ python3 tests/test_site.py     # 390×844 화면·버튼·저장·오프라인·
 python3 tests/test_worker.py   # (선택) Worker 정규화·CORS·캐시·폴백·오류
 python3 tools/make_icons.py    # 아이콘 재생성
 ```
+
+중계 상태는 `curl -s 'https://bus-stop-25159.mokbo97.workers.dev/?arsId=25159' | head -c 300` 로 확인합니다.
