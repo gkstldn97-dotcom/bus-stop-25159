@@ -419,6 +419,14 @@ body {
   color: var(--text-mute);
 }
 
+/* 중계 서버 없이 정류장 안내만 보여 줄 때 */
+.eta__main[data-state="static"] {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
 .eta__sub {
   font-size: 13px;
   color: var(--text-dim);

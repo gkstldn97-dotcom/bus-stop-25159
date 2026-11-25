@@ -9,14 +9,15 @@
   const REFRESH_MS = 30000;
   const FETCH_TIMEOUT_MS = 9000;
 
-  /* 정류장 표지판에 적힌 노선. 중계 서버가 연결되기 전에도 어떤 버스가 오는지 보여 준다. */
+  /* 정류장 표지판에 적힌 노선과 배차·첫차·막차(서울시 TOPIS 실측값).
+     중계 서버 없이 GitHub Pages만으로 써도 이 안내는 그대로 보인다. */
   const STATIC_ROUTES = [
-    { route: "340", dir: "강남역", category: "trunk", categoryLabel: "간선" },
-    { route: "3318", dir: "마천동", category: "branch", categoryLabel: "지선" },
-    { route: "3321", dir: "강동구청", category: "branch", categoryLabel: "지선" },
-    { route: "3324", dir: "강동역", category: "branch", categoryLabel: "지선" },
-    { route: "3411", dir: "한티역", category: "branch", categoryLabel: "지선" },
-    { route: "N31", dir: "국민대", category: "night", categoryLabel: "심야" },
+    { route: "340", dir: "강남역", category: "trunk", categoryLabel: "간선", first: "04:30", last: "23:10", term: 7 },
+    { route: "3318", dir: "마천동", category: "branch", categoryLabel: "지선", first: "04:30", last: "23:10", term: 12 },
+    { route: "3321", dir: "강동구청", category: "branch", categoryLabel: "지선", first: "04:30", last: "23:40", term: 14 },
+    { route: "3324", dir: "강동역", category: "branch", categoryLabel: "지선", first: "04:20", last: "23:20", term: 13 },
+    { route: "3411", dir: "한티역", category: "branch", categoryLabel: "지선", first: "04:30", last: "23:10", term: 11 },
+    { route: "N31", dir: "국민대", category: "night", categoryLabel: "심야", first: "23:30", last: "03:50", term: 38 },
   ];
 
   const LS = {
@@ -259,13 +260,14 @@
     el.routes.replaceChildren(frag);
   }
 
-  /* 실시간 데이터가 없을 때: 노선 목록만 보여 준다 */
+  /* 실시간 데이터가 없을 때: 정류장 안내(노선·배차·첫차·막차)와 즐겨찾기 고정 */
   function renderStatic() {
     const frag = document.createDocumentFragment();
-    for (const route of STATIC_ROUTES) {
+    for (const route of orderedRoutes(STATIC_ROUTES)) {
       const li = document.createElement("li");
-      li.className = "route is-ended";
+      li.className = "route is-static";
       li.dataset.route = route.route;
+      if (state.pins.includes(route.route)) li.classList.add("is-pinned");
 
       const badge = document.createElement("div");
       badge.className = "badge";
@@ -274,22 +276,40 @@
 
       const body = document.createElement("div");
       body.className = "route__body";
+
       const top = document.createElement("div");
       top.className = "route__top";
       const dir = document.createElement("span");
       dir.className = "route__dir";
       dir.textContent = route.dir + " 방면";
       top.appendChild(dir);
+
+      const pin = document.createElement("button");
+      pin.type = "button";
+      pin.className = "pin";
+      pin.setAttribute("aria-label", route.route + " 노선 고정");
+      pin.setAttribute("aria-pressed", state.pins.includes(route.route) ? "true" : "false");
+      pin.textContent = state.pins.includes(route.route) ? "★" : "☆";
+      pin.addEventListener("click", () => togglePin(route.route));
+      top.appendChild(pin);
       body.appendChild(top);
 
       const eta = document.createElement("div");
       eta.className = "eta";
       const main = document.createElement("span");
       main.className = "eta__main";
-      main.dataset.state = "none";
-      main.textContent = "실시간 정보 없음";
+      main.dataset.state = "static";
+      main.dataset.role = "term";
+      main.textContent = route.term ? "배차 " + route.term + "분" : route.categoryLabel;
       eta.appendChild(main);
       body.appendChild(eta);
+
+      if (route.first && route.last) {
+        const meta = document.createElement("div");
+        meta.className = "route__meta";
+        meta.textContent = "첫차 " + route.first + " · 막차 " + route.last;
+        body.appendChild(meta);
+      }
 
       li.appendChild(badge);
       li.appendChild(body);
@@ -340,15 +360,6 @@
   /* ── 배너 ───────────────────────────────────────── */
   function showBanner(kind) {
     const b = el.banner;
-    if (kind === "setup") {
-      b.hidden = false;
-      b.innerHTML =
-        "<strong>실시간 정보를 켜 주세요</strong>중계 서버(Cloudflare Worker) 주소를 한 번만 넣으면 도착 시간이 여기에 바로 표시됩니다." +
-        '<div class="banner__actions"><button type="button" class="primary" id="bannerSetup">서버 주소 넣기</button>' +
-        '<a href="https://map.naver.com/p/bus/bus-station/-/bus-station/109370" target="_blank" rel="noopener">네이버지도로 보기</a></div>';
-      $("bannerSetup").addEventListener("click", openSettings);
-      return;
-    }
     if (kind === "error") {
       b.hidden = false;
       b.innerHTML =
@@ -364,19 +375,29 @@
   }
 
   /* ── 데이터 ─────────────────────────────────────── */
+  /* 중계 서버 없이 쓰는 기본 모드: 정류장 안내 + 지도 바로가기 중심 */
+  function enterStaticMode() {
+    state.data = null;
+    state.fetchedAt = 0;
+    state.error = null;
+    showBanner(null);
+    setStatus("idle", "정류장 안내 · 노선 " + STATIC_ROUTES.length + "개");
+    el.refresh.hidden = true;
+    el.refresh.disabled = true;
+    el.footnote.textContent = "실시간 도착은 아래 지도 버튼에서 · ★ 누르면 맨 위 고정";
+    render();
+  }
+
   async function load(manual) {
     if (state.loading) return;
     const url = apiUrl();
     if (!url) {
-      showBanner("setup");
-      setStatus("idle", "중계 서버 미설정");
-      el.refresh.disabled = true;
-      el.footnote.textContent = "노선 목록은 정류장 표지판 기준입니다";
-      render();
+      enterStaticMode();
       return;
     }
 
     state.loading = true;
+    el.refresh.hidden = false;
     el.refresh.disabled = true;
     el.refresh.classList.add("is-spinning");
     if (!state.data) renderSkeleton();
@@ -511,12 +532,8 @@
     writeLS(LS.api, base);
     closeSettings();
     if (!base) {
-      setStatus("idle", "중계 서버 미설정");
-      showBanner("setup");
-      el.refresh.disabled = true;
-      state.data = null;
-      el.footnote.textContent = "노선 목록은 정류장 표지판 기준입니다";
-      render();
+      toast("정류장 안내로 볼게요");
+      enterStaticMode();
       return;
     }
     toast("저장했어요");
@@ -549,6 +566,7 @@
   }
 
   function restoreLast() {
+    if (!state.api) return;
     try {
       const saved = JSON.parse(readLS(LS.last) || "null");
       if (saved && saved.data && Array.isArray(saved.data.routes) && saved.at) {

@@ -1,5 +1,5 @@
 /* 앱 셸 캐시. 도착 정보는 워커가 매번 새로 받아오므로 여기서 캐시하지 않는다. */
-const CACHE = "bus25159-v1";
+const CACHE = "bus25159-v2";
 const SHELL = [
   "./",
   "./index.html",
