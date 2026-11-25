@@ -143,17 +143,46 @@
     return f.main.replace(" ", "") + (f.sub ? " · " + f.sub.replace("후 · ", "") : "");
   }
 
-  /* ── 렌더 ───────────────────────────────────────── */
-  function orderedRoutes(routes) {
+  /* ── 정렬: 실시간으로 빨리 오는 순 ─────────────── */
+  /* 남은 도착 시간(초). 운행종료·도착 정보 없음·출발대기는 null → 맨 아래로 보낸다. */
+  function arrivalSec(route, elapsedSec) {
+    const eta = route.eta1 || {};
+    const st = eta.state || "running";
+    if (st === "ended" || st === "none" || st === "waiting") return null;
+    if (typeof eta.sec !== "number" || !isFinite(eta.sec)) return null;
+    return eta.sec - (elapsedSec || 0);
+  }
+
+  function byArrival(elapsedSec) {
+    return (a, b) => {
+      const sa = arrivalSec(a, elapsedSec);
+      const sb = arrivalSec(b, elapsedSec);
+      if (sa === null && sb === null) return 0;
+      if (sa === null) return 1;
+      if (sb === null) return -1;
+      return sa - sb;
+    };
+  }
+
+  /* ★ 고정 노선이 있으면 고정끼리 먼저(그 안에서도 빨리 오는 순),
+     나머지도 빨리 오는 순. 도착 정보가 같으면 노선 표 순서를 그대로 둔다. */
+  function orderedRoutes(routes, elapsedSec) {
+    const cmp = byArrival(elapsedSec);
     const pinned = [];
     const rest = [];
-    for (const r of routes) {
-      if (state.pins.includes(r.route)) pinned.push(r);
-      else rest.push(r);
-    }
-    pinned.sort((a, b) => state.pins.indexOf(a.route) - state.pins.indexOf(b.route));
-    return pinned.concat(rest);
+    routes.forEach((r, i) => {
+      (state.pins.includes(r.route) ? pinned : rest).push({ r, i });
+    });
+    const pinRank = (route) => {
+      const k = state.pins.indexOf(route);
+      return k < 0 ? state.pins.length : k;
+    };
+    pinned.sort((a, b) => cmp(a.r, b.r) || pinRank(a.r.route) - pinRank(b.r.route) || a.i - b.i);
+    rest.sort((a, b) => cmp(a.r, b.r) || a.i - b.i);
+    return pinned.concat(rest).map((x) => x.r);
   }
+
+  /* ── 렌더 ───────────────────────────────────────── */
 
   function routeCard(route, elapsedSec) {
     const li = document.createElement("li");
@@ -254,16 +283,20 @@
       renderStatic();
       return;
     }
-    const elapsed = Math.max(0, Math.round((Date.now() - state.fetchedAt) / 1000));
+    const elapsed = elapsedSec();
     const frag = document.createDocumentFragment();
-    for (const route of orderedRoutes(data.routes)) frag.appendChild(routeCard(route, elapsed));
+    for (const route of orderedRoutes(data.routes, elapsed)) frag.appendChild(routeCard(route, elapsed));
     el.routes.replaceChildren(frag);
+  }
+
+  function elapsedSec() {
+    return state.fetchedAt ? Math.max(0, Math.round((Date.now() - state.fetchedAt) / 1000)) : 0;
   }
 
   /* 실시간 데이터가 없을 때: 정류장 안내(노선·배차·첫차·막차)와 즐겨찾기 고정 */
   function renderStatic() {
     const frag = document.createDocumentFragment();
-    for (const route of orderedRoutes(STATIC_ROUTES)) {
+    for (const route of orderedRoutes(STATIC_ROUTES, 0)) {
       const li = document.createElement("li");
       li.className = "route is-static";
       li.dataset.route = route.route;
@@ -329,10 +362,12 @@
     el.routes.replaceChildren(frag);
   }
 
-  /* 1초마다 도착 시간만 갱신 (카드 전체를 다시 그리지 않는다) */
+  /* 1초마다 도착 시간만 갱신하고, 순서가 달라졌을 때만 카드를 옮긴다
+     (남은 시간은 모든 노선이 같이 줄어 순서가 요동치지 않는다) */
   function tickRender() {
     if (!state.data || !state.fetchedAt) return;
-    const elapsed = Math.max(0, Math.round((Date.now() - state.fetchedAt) / 1000));
+    const elapsed = elapsedSec();
+    syncOrder(elapsed);
     for (const route of state.data.routes) {
       const li = el.routes.querySelector('[data-route="' + cssEscape(route.route) + '"]');
       if (!li) continue;
@@ -351,6 +386,21 @@
         next.textContent = "다음 " + shortEta(route.eta2, rem2);
       }
     }
+  }
+
+  /* 순서만 다시 맞춘다: 기존 카드를 옮겨 쓰므로 1초마다 깜빡이지 않는다 */
+  function syncOrder(elapsed) {
+    const want = orderedRoutes(state.data.routes, elapsed);
+    const nodes = want.map((r) => el.routes.querySelector('[data-route="' + cssEscape(r.route) + '"]'));
+    if (nodes.some((n) => !n) || el.routes.children.length !== want.length) {
+      render();
+      return;
+    }
+    let moved = false;
+    nodes.forEach((node, i) => {
+      if (el.routes.children[i] !== node) moved = true;
+    });
+    if (moved) nodes.forEach((node) => el.routes.appendChild(node));
   }
 
   function cssEscape(v) {
@@ -420,7 +470,7 @@
       setStatus("ok", "실시간 · " + timeLabel(state.fetchedAt) + " 갱신");
       el.footnote.textContent =
         (body.source === "kakao" ? "카카오맵 도착정보 기준" : body.source === "data.go.kr" ? "공공데이터포털 기준" : "서울시 버스 도착정보 기준") +
-        " · 30초마다 자동 새로고침";
+        " · 도착 빠른 순 · 30초마다 자동 새로고침";
       if (manual) toast("새로고침 완료");
     } catch (e) {
       state.error = String((e && e.message) || e);

@@ -101,7 +101,20 @@ def main():
         cards = page.locator(".route")
         check("노선 카드 6개 렌더", cards.count() == 6, cards.count())
         names = page.locator(".badge").all_inner_texts()
-        check("노선 번호 순서/내용", names == ["340", "3318", "3321", "3324", "3411", "N31"], names)
+        # 실시간 도착이 빨리 오는 순: 340·3318(곧 도착, 29초) → 3411(417초) → 3324(853초) → 3321(1050초) → N31(운행종료)
+        expect_order = ["340", "3318", "3411", "3324", "3321", "N31"]
+        check("도착 빠른 순 정렬", names == expect_order, names)
+
+        secs = {r["route"]: (r.get("eta1") or {}).get("sec") for r in payload["routes"]}
+
+        def sort_key(n):
+            s = secs.get(n)
+            return (1, 0) if not isinstance(s, int) else (0, s)
+
+        keys = [sort_key(n) for n in names]
+        check("남은 시간 오름차순", keys == sorted(keys), list(zip(names, keys)))
+        check("운행종료 노선 맨 아래", names[-1] == "N31" and secs["N31"] is None, names[-1])
+        check("곧 도착 노선이 맨 위", all("곧 도착" in page.locator(f'.route[data-route="{n}"] [data-role="eta1"]').inner_text() for n in names[:2]), names[:2])
 
         cats = page.eval_on_selector_all(".badge", "els => els.map(e => e.dataset.cat)")
         check("색상 구분(간선/지선/심야)", cats[:2] == ["trunk", "branch"] and cats[-1] == "night", cats)
@@ -114,21 +127,29 @@ def main():
         meta = page.locator('.route[data-route="340"] .route__meta').inner_text()
         check("배차·첫차·막차 표기", "배차" in meta and ":" in meta, meta)
 
-        # 숫자가 1초 후 줄어드는지 (카운트다운)
+        # 숫자가 1초 후 줄어드는지 (카운트다운) + 순서는 그대로인지
         before = page.locator('.route[data-route="3411"] [data-role="eta1"]').inner_text()
+        order_before = page.locator(".badge").all_inner_texts()
         page.wait_for_timeout(2200)
         after = page.locator('.route[data-route="3411"] [data-role="eta1"]').inner_text()
+        order_after = page.locator(".badge").all_inner_texts()
         check("1초 카운트다운 동작", before != after or "곧 도착" in before or "운행종료" in before, (before, after))
+        check("카운트다운 중 순서 유지", order_before == order_after == expect_order, (order_before, order_after))
+        check("카운트다운 중 카드 중복 없음", page.locator(".route").count() == 6, page.locator(".route").count())
 
         page.screenshot(path=str(SHOTS / "01-home.png"), full_page=True)
 
-        # 즐겨찾기 고정
+        # 즐겨찾기 고정: 고정끼리 먼저, 그 안에서도 빨리 오는 순
+        page.locator('.route[data-route="3324"] .pin').click()
+        page.wait_for_timeout(250)
         page.locator('.route[data-route="3411"] .pin').click()
         page.wait_for_timeout(300)
         order = page.locator(".badge").all_inner_texts()
-        check("고정 시 맨 위로 이동", order[0] == "3411", order)
+        check("고정 노선이 맨 위", order[:2] == ["3411", "3324"], order)
+        check("고정 안에서도 빨리 오는 순", order[0] == "3411", order)
+        check("나머지도 빨리 오는 순", order[2:] == ["340", "3318", "3321", "N31"], order)
         stored = page.evaluate("localStorage.getItem('bus25159.pins')")
-        check("고정 상태 저장", stored and "3411" in stored, stored)
+        check("고정 상태 저장", stored and "3411" in stored and "3324" in stored, stored)
         page.screenshot(path=str(SHOTS / "02-pinned.png"), full_page=True)
 
         # 새로고침 버튼
@@ -141,6 +162,63 @@ def main():
         n_before = hit["count"]
         page.wait_for_timeout(31000)
         check("30초 자동 새로고침", hit["count"] > n_before, (n_before, hit["count"]))
+
+        # 새 도착 시간이 오면(새로고침) 순서를 다시 계산한다 — 고정 없는 새 컨텍스트
+        live = {"payload": payload}
+        sctx = browser.new_context(viewport={"width": 390, "height": 844}, device_scale_factor=3,
+                                   locale="ko-KR", timezone_id="Asia/Seoul", is_mobile=True,
+                                   has_touch=True, service_workers="block")
+        spage = sctx.new_page()
+        serrs = []
+        spage.on("pageerror", lambda e: serrs.append(str(e)))
+        spage.route(any_host, lambda r: r.fulfill(status=200, content_type="application/json",
+                                                  body=json.dumps(live["payload"], ensure_ascii=False),
+                                                  headers={"access-control-allow-origin": "*"}))
+        spage.add_init_script(f"localStorage.setItem('bus25159.api', '{SB_API}');")
+        spage.goto(f"http://127.0.0.1:{PORT}/site/index.html")
+        spage.wait_for_selector(".route", timeout=15000)
+        o0 = spage.locator(".badge").all_inner_texts()
+        check("새로고침 전 순서", o0 == expect_order, o0)
+
+        def mutate(secs_map, states=None):
+            body = json.loads(json.dumps(payload))
+            for r in body["routes"]:
+                s = secs_map.get(r["route"])
+                if s is None:
+                    continue
+                r["eta1"] = dict(r["eta1"] or {})
+                r["eta1"]["sec"] = s
+                r["eta1"]["state"] = "soon" if s <= 30 else "running"
+                r["eta1"]["msg"] = "곧 도착" if s <= 30 else "%d초후" % s
+            for name, state in (states or {}).items():
+                for r in body["routes"]:
+                    if r["route"] == name:
+                        r["eta1"] = {"msg": {"none": "정보 없음", "waiting": "출발대기", "ended": "운행종료"}[state],
+                                     "state": state, "sec": None, "stops": None}
+            return body
+
+        def refresh_order():
+            spage.locator("#refreshBtn").click()
+            spage.wait_for_timeout(1200)
+            return spage.locator(".badge").all_inner_texts()
+
+        live["payload"] = mutate({"3321": 95, "3324": 300, "3411": 520, "3318": 700, "340": 900})
+        o = refresh_order()
+        check("새로고침 후 새 도착 시간 순서", o == ["3321", "3324", "3411", "3318", "340", "N31"], o)
+        spage.screenshot(path=str(SHOTS / "21-sort-refresh.png"), full_page=True)
+
+        live["payload"] = mutate({"3321": 95, "3324": 300, "3411": 520}, {"340": "none", "3318": "waiting"})
+        o = refresh_order()
+        check("정보 없음·출발대기 맨 아래", o == ["3321", "3324", "3411", "340", "3318", "N31"], o)
+        none_txt = spage.locator('.route[data-route="340"] [data-role="eta1"]').inner_text()
+        check("정보 없음 표기", none_txt == "정보 없음", none_txt)
+
+        live["payload"] = mutate({"3321": 95, "3324": 300, "3411": 520, "3318": 700, "340": -90})
+        o = refresh_order()
+        check("도착한 버스가 맨 위", o[0] == "340", o)
+        check("순서 변경 뒤 카드 6개", spage.locator(".route").count() == 6, spage.locator(".route").count())
+        check("순서 테스트 JS 예외 0", len(serrs) == 0, serrs[:2])
+        sctx.close()
 
         # 번호 복사 (클립보드 권한 부여)
         ctx.grant_permissions(["clipboard-read", "clipboard-write"])
